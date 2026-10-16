@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 128 128">
+  <defs>
+    <style>
+      .cls-1{fill:none;stroke:#c7c7c7;stroke-width:10;stroke-linecap:round;stroke-linejoin:round}
+    </style>
+  </defs>
+  <title>Untitled-6</title>
+  <g id="Layer_1" data-name="Layer 1">
+    <path d="M121.865 63.694 C121.865 47.635 115.357 33.097 104.834 22.574 C94.31 12.051 79.772 5.54 63.714 5.54 C47.658 5.54 33.124 12.046 22.601 22.564 C12.073 33.087 5.56 47.63 5.56 63.691 C5.56 75.734 9.221 86.922 15.491 96.204 C17.58 99.299 2.227 119.914 4.858 122.545 C7.611 125.298 28.374 110.045 31.635 112.204 C40.829 118.296 51.856 121.845 63.714 121.845 C95.83 121.847 121.865 95.813 121.865 63.694 Z" class="cls-1"/>
+    <path id="Vector" d="M37.419 92.468 L89 92.468 M63.209 27.426 L63.209 77.604 M63.209 77.604 L84.701 56.112 M63.209 77.604 L41.717 56.112" class="cls-1"/>
+  </g>
+</svg>
