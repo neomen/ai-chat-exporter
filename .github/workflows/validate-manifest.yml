@@ -10,7 +10,8 @@ on:
     paths:
       - 'manifest.json'
   workflow_dispatch:
-
+permissions:
+  contents: write
 jobs:
   validate:
     name: Validate manifest.json
