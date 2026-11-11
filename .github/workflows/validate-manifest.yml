@@ -11,6 +11,9 @@ on:
       - 'manifest.json'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   validate:
     name: Validate manifest.json (Chrome)
@@ -23,6 +26,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          # cache: 'npm' — не включаем, lock-файла в проекте нет
 
       - name: Cache global npm packages
         uses: actions/cache@v4
@@ -39,15 +43,16 @@ jobs:
         uses: actions/cache@v4
         with:
           path: chrome-manifest-schema.json
-          key: ${{ runner.os }}-chrome-schema-v1
+          key: ${{ runner.os }}-chrome-schema-v3
           restore-keys: |
             ${{ runner.os }}-chrome-schema-
 
-      - name: Fetch Chrome manifest schema
+      - name: Fetch Chrome manifest schema (V3)
         run: |
           if [ ! -f chrome-manifest-schema.json ]; then
-            curl -sSL -o chrome-manifest-schema.json \
-              https://raw.githubusercontent.com/GoogleChrome/chrome-extensions-samples/main/_schema/manifest.json
+            echo "⬇️ Downloading Chrome Manifest V3 schema..."
+            curl -fsSL -o chrome-manifest-schema.json \
+              https://raw.githubusercontent.com/swantbo/chrome-extesion-manifest-json-schema/main/manifest/manifest.schema.v3.json
           else
             echo "✅ Using cached schema"
           fi
