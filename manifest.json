@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "AI Chat Exporter (DeepSeek, Grok, ChatGPT, Qwen)",
+  "name": "AI Chat Exporter (DeepSeek, Grok, ChatGPT, Qwen, Claude)",
   "version": "2.0",
   "description": "Export your AI chats to Markdown — locally, privately, with one click.",
   "permissions": [
@@ -15,7 +15,8 @@
     "https://twitter.com/i/grok*",
     "https://chatgpt.com/*",
     "https://chat.openai.com/*",
-    "https://chat.qwen.ai/*"
+    "https://chat.qwen.ai/*",
+    "https://claude.ai/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -42,9 +43,12 @@
         "https://twitter.com/i/grok*",
         "https://chatgpt.com/*",
         "https://chat.openai.com/*",
-        "https://chat.qwen.ai/*"
+        "https://chat.qwen.ai/*",
+        "https://claude.ai/*"
       ],
-      "js": ["content.js"],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_idle"
     }
   ]
