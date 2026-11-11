@@ -245,6 +245,177 @@ function boot() {
       }
     },
 
+    // ============================================================
+    //  CLAUDE
+    // ============================================================
+
+    claude: {
+      name: 'claude',
+      match: (loc) => loc.hostname === 'claude.ai',
+
+      title: () =>
+        document.title.replace(/\s*[-|]\s*Claude.*$/i, '').trim() || 'Claude Chat',
+
+      findScroller: () => {
+        // Let the shared helper locate Claude's actual scrollable ancestor.
+        // The transcript-list wrapper itself is not guaranteed to scroll.
+        return (
+          document.querySelector('main div[class*="overflow-y-auto"]') ||
+          document.querySelector('main div[class*="overflow"]') ||
+          null
+        );
+      },
+
+      async collectMessages() {
+        const collected = new Map();
+
+        const collectRow = (row, fallbackIndex) => {
+          const userNode = row.querySelector('[data-testid="user-message"]');
+          const assistantNode = row.querySelector('[data-testid="assistant-message"]');
+          const rowRole = row.getAttribute('data-perf-row');
+
+          // data-perf-row is the role marker on Claude's transcript rows.
+          // The test IDs provide a more explicit fallback and identify the
+          // actual message root rather than a typography class.
+          let role;
+          let messageNode;
+
+          if (rowRole === 'human' || userNode) {
+            role = 'user';
+            messageNode = userNode;
+          } else if (rowRole === 'assistant' || assistantNode) {
+            role = 'assistant';
+            messageNode = assistantNode;
+          } else {
+            return;
+          }
+
+          if (!messageNode) return;
+
+          const text = cleanContent(messageNode, {
+            codeBlocks: 'pre',
+            codeBody: 'pre code, pre',
+            ui: [
+              '[data-find-omitted]',
+              'h3.sr-only',
+              '[data-cds="MessageActions"]',
+              '[data-testid="message-actions"]',
+              '[data-cds="TurnStatus"]',
+              '[data-testid="file-card-stack"]',
+              '[data-testid="growth-inline-line"]',
+              'button',
+              '[role="button"]',
+              'svg',
+              '[aria-label*="Copy"]',
+              '[aria-label*="copy"]',
+              '[data-testid*="feedback"]',
+              '[data-testid*="action"]'
+            ]
+          });
+
+          if (!text) return;
+
+          const messageId =
+            messageNode.getAttribute('data-turn-key') ||
+            messageNode.id ||
+            `${role}-${row.getAttribute('data-index') || fallbackIndex}`;
+
+          const order = Number.parseInt(
+            row.getAttribute('data-index') || row.getAttribute('data-rs-index'),
+            10
+          );
+
+          const existing = collected.get(messageId);
+
+          // A row can be encountered more than once while scrolling.
+          // Keep the fuller snapshot if Claude is still streaming or
+          // the DOM updated.
+          if (!existing || text.length >= existing.text.length) {
+            collected.set(messageId, {
+              key: Number.isFinite(order) ? order : fallbackIndex,
+              role,
+              text,
+              thinking: ''
+            });
+          }
+        };
+
+        const collect = () => {
+          const rows = document.querySelectorAll(
+            '[data-testid="transcript-row"]'
+          );
+
+          if (rows.length) {
+            rows.forEach((row, index) => collectRow(row, index));
+            return;
+          }
+
+          // Fallback for a future Claude layout where message roots remain
+          // available but transcript-row wrappers are renamed or removed.
+          const nodes = document.querySelectorAll(
+            '[data-testid="user-message"], [data-testid="assistant-message"]'
+          );
+
+          nodes.forEach((node, index) => {
+            const role = node.matches('[data-testid="user-message"]')
+              ? 'user'
+              : 'assistant';
+
+            const text = cleanContent(node, {
+              codeBlocks: 'pre',
+              codeBody: 'pre code, pre',
+              ui: [
+                '[data-find-omitted]',
+                'h3.sr-only',
+                '[data-cds="MessageActions"]',
+                '[data-testid="message-actions"]',
+                '[data-cds="TurnStatus"]',
+                'button',
+                '[role="button"]',
+                'svg',
+                '[aria-label*="Copy"]',
+                '[aria-label*="copy"]'
+              ]
+            });
+
+            if (!text) return;
+
+            const messageId =
+              node.getAttribute('data-turn-key') || node.id || `${role}-${index}`;
+
+            const row = node.closest('[data-testid="transcript-row"]');
+
+            const order = Number.parseInt(
+              row?.getAttribute('data-index') || `${index}`,
+              10
+            );
+
+            const existing = collected.get(messageId);
+
+            if (!existing || text.length >= existing.text.length) {
+              collected.set(messageId, {
+                key: Number.isFinite(order) ? order : index,
+                role,
+                text,
+                thinking: ''
+              });
+            }
+          });
+        };
+
+        collect();
+        await scrollAndCollect(ADAPTERS.claude, collect);
+
+        if (!collected.size) {
+          throw new Error(
+            'No Claude messages found. Open a Claude conversation with history first.'
+          );
+        }
+
+        return [...collected.values()].sort((a, b) => a.key - b.key);
+      }
+    },
+
     qwen: {
       name: 'qwen',
       match: (loc) => loc.hostname === 'chat.qwen.ai',
@@ -281,6 +452,7 @@ function boot() {
             const msgId =
               wrapper.querySelector('[data-msg-id]')?.getAttribute('data-msg-id') ||
               `qwen-${collected.size}`;
+
             if (collected.has(msgId)) continue;
 
             const isUser = wrapper.classList.contains('qwen-chat-message-user');
@@ -289,9 +461,9 @@ function boot() {
             // Разные контейнеры контента для user и assistant
             const contentEl = isUser
               ? wrapper.querySelector('.user-message-content') ||
-              wrapper.querySelector('p.whitespace-pre-wrap')
+                wrapper.querySelector('p.whitespace-pre-wrap')
               : wrapper.querySelector('.response-message-content') ||
-              wrapper.querySelector('.qwen-markdown');
+                wrapper.querySelector('.qwen-markdown');
 
             if (!contentEl) continue;
 
@@ -299,9 +471,9 @@ function boot() {
               codeBlocks: 'pre',
               codeBody: 'pre code, pre',
               ui: [
-                '.qwen-chat-thinking-tool-status-card-wraper', // "Thinking completed"
+                '.qwen-chat-thinking-tool-status-card-wraper',
                 '.qwen-chat-tool-status-card',
-                '.message-hoc-container',                      // кнопки Copy/Edit/Delete/Good/Bad
+                '.message-hoc-container',
                 '.user-message-footer',
                 '.response-message-footer',
                 '.qwen-chat-package-comp-new-action-control',
@@ -315,6 +487,7 @@ function boot() {
                 '[aria-label*="copy"]'
               ]
             });
+
             if (!text) continue;
 
             collected.set(msgId, {
@@ -332,6 +505,7 @@ function boot() {
         if (!collected.size) {
           throw new Error('No Qwen messages found.');
         }
+
         return [...collected.values()].sort((a, b) => a.key - b.key);
       }
     }
@@ -350,13 +524,16 @@ function boot() {
     if (opts.codeBlocks) {
       clone.querySelectorAll(opts.codeBlocks).forEach((block) => {
         let lang = '';
+
         if (opts.codeLang) {
           const langEl = block.querySelector(opts.codeLang);
           lang = (langEl?.textContent || '').trim().toLowerCase();
         }
+
         const codeEl = opts.codeBody
           ? block.querySelector(opts.codeBody) || block
           : block;
+
         let code = (codeEl.innerText || '').replace(/\n+$/, '');
 
         const fence = document.createElement('pre');
@@ -373,8 +550,11 @@ function boot() {
     // Attach to DOM briefly so innerText respects visual layout
     clone.style.cssText =
       'position:fixed;left:-99999px;top:0;white-space:pre-wrap;';
+
     document.body.appendChild(clone);
+
     let text = (clone.innerText || '').trim();
+
     clone.remove();
 
     // 3. Strip leftover service strings
@@ -389,11 +569,13 @@ function boot() {
   function findScrollableElement(adapter) {
     // Adapter-provided first
     let scroller = adapter.findScroller && adapter.findScroller();
+
     if (scroller) return scroller;
 
     // Generic fallback: any scrollable container with meaningful content
     const candidates = [...document.querySelectorAll('div')].filter((el) => {
       const s = getComputedStyle(el);
+
       return (
         /auto|scroll/.test(s.overflowY) &&
         el.scrollHeight > el.clientHeight + 100
@@ -406,7 +588,7 @@ function boot() {
 
   // ============================================================
   //  UNIFIED SCROLL + COLLECT LOOP
-  //  Used by every platform. Replaces the old scattered logic.
+  //  Used by every platform.
   // ============================================================
 
   async function scrollAndCollect(adapter, collectFn, opts = {}) {
@@ -462,6 +644,7 @@ function boot() {
       collectFn();
 
       const step = Math.max(300, Math.floor(getClientHeight() * stepRatio));
+
       while (getScrollTop() + getClientHeight() < getScrollHeight() - 4) {
         scrollBy(step);
         await sleep(stepDelayMs);
@@ -473,8 +656,10 @@ function boot() {
 
       // Approximate "size" by last message count — adapter stores in its Map
       const currentSize = getLastCollectedSize(adapter);
-      if (currentSize === prevSize) stableRounds++;
-      else {
+
+      if (currentSize === prevSize) {
+        stableRounds++;
+      } else {
         stableRounds = 0;
         prevSize = currentSize;
       }
@@ -484,6 +669,7 @@ function boot() {
   // Small hack: we need to know how many items the adapter has collected,
   // but the Map lives inside its closure. We expose a getter via a shared ref.
   const __state = { lastSize: 0 };
+
   function getLastCollectedSize() {
     return __state.lastSize;
   }
@@ -491,18 +677,17 @@ function boot() {
   // Wrap each adapter.collectMessages so we can observe progress
   for (const key of Object.keys(ADAPTERS)) {
     const original = ADAPTERS[key].collectMessages;
+
     ADAPTERS[key].collectMessages = async function () {
       const origCollect = original;
-      // We patch the inner collect loop by monkey-patching scrollAndCollect's
-      // size source. Simpler: just observe via a periodic timer while we run.
       const resultPromise = origCollect.call(this);
+
       const interval = setInterval(() => {
-        // Count collected messages by looking at the running promise's state —
-        // actually, we just count DOM hits for this adapter as a proxy.
         __state.lastSize = document.querySelectorAll(
           adapterProbeSelector(key)
         ).length;
       }, 150);
+
       try {
         const result = await resultPromise;
         __state.lastSize = result.length;
@@ -517,41 +702,54 @@ function boot() {
     switch (name) {
       case 'deepseek':
         return '[data-virtual-list-item-key]';
+
       case 'grok':
         return 'div[id^="response-"]';
+
       case 'chatgpt':
         return 'article[data-testid*="conversation-turn"]';
+
       case 'qwen':
         return '[data-role], [class*="message-user"], [class*="message-assistant"]';
+
+      case 'claude':
+        return '[data-testid="transcript-row"]';
+
       default:
         return '[data-message-author-role]';
     }
   }
 
   // ============================================================
-  //  MARKDOWN BUILDER (single source of truth)
+  //  MARKDOWN BUILDER
   // ============================================================
 
   const MarkdownBuilder = {
     build({ title, messages }) {
       const lines = [];
+
       lines.push(`# ${title}`);
       lines.push('');
+
       lines.push(`_Exported on ${new Date().toISOString().slice(0, 10)}_`);
       lines.push('');
+
       lines.push('---');
       lines.push('');
 
       for (const m of messages) {
         const label = m.role === 'user' ? 'User' : 'Assistant';
+
         lines.push(`## ${label}`);
         lines.push('');
+
         if (m.thinking && m.thinking.trim()) {
           lines.push('> **Thinking:**');
           lines.push('>');
           lines.push(...m.thinking.split('\n').map((l) => '> ' + l));
           lines.push('');
         }
+
         lines.push(m.text);
         lines.push('');
         lines.push('---');
@@ -583,11 +781,13 @@ function boot() {
     const blob = new Blob([content], {
       type: 'text/markdown;charset=utf-8'
     });
+
     const url = URL.createObjectURL(blob);
 
     const a = document.createElement('a');
     a.href = url;
     a.download = `${baseName}.md`;
+
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -605,10 +805,12 @@ function boot() {
       error: { bg: '#ef4444', fg: '#fff' },
       info: { bg: '#1a1a2e', fg: '#fff' }
     };
+
     const { bg, fg } = colors[type] || colors.info;
 
     const div = document.createElement('div');
     div.textContent = text;
+
     Object.assign(div.style, {
       position: 'fixed',
       bottom: '20px',
@@ -625,6 +827,7 @@ function boot() {
       opacity: '1',
       transform: 'translateY(0)'
     });
+
     document.body.appendChild(div);
 
     setTimeout(() => {
@@ -644,6 +847,7 @@ function boot() {
         return ADAPTERS[key];
       }
     }
+
     return null;
   }
 
@@ -658,10 +862,12 @@ function boot() {
       showNotification('Export already in progress…', 'info');
       return;
     }
+
     isExporting = true;
 
     try {
       const adapter = detectAdapter();
+
       if (!adapter) {
         showNotification('This page is not supported.', 'error');
         return;
@@ -674,6 +880,7 @@ function boot() {
       const markdown = MarkdownBuilder.build({ title, messages });
 
       downloadFile(markdown, sanitizeFilename(title));
+
       showNotification(
         `✅ Exported ${messages.length} messages.`,
         'success'
@@ -695,11 +902,13 @@ function boot() {
       sendResponse({ ok: true });
       return;
     }
+
     if (request?.action === 'export_chat') {
       handleExport().then(
         () => sendResponse({ success: true }),
         (err) => sendResponse({ success: false, error: err.message })
       );
+
       return true; // keep sendResponse channel open for async
     }
   });

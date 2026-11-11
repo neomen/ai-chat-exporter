@@ -9,7 +9,8 @@ const SUPPORTED_HOSTS = [
   'grok.com',
   'chatgpt.com',
   'chat.openai.com',
-  'chat.qwen.ai'
+  'chat.qwen.ai',
+  'claude.ai'
 ];
 
 const GROK_PATH_HOSTS = ['x.com', 'twitter.com'];
@@ -85,7 +86,7 @@ chrome.action.onClicked.addListener(async (tab) => {
   if (!isSupportedUrl(tab.url)) {
     notify(
       'Not supported',
-      'Open a supported chat page first (DeepSeek, Grok, ChatGPT or Qwen).'
+      'Open a supported chat page first (DeepSeek, Grok, ChatGPT, Qwen or Claude).'
     );
     return;
   }

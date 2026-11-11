@@ -10,11 +10,13 @@ on:
     paths:
       - 'manifest.json'
   workflow_dispatch:
+
 permissions:
   contents: write
+
 jobs:
   validate:
-    name: Validate manifest.json
+    name: Validate manifest.json (Chrome)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -24,17 +26,43 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+          # cache: 'npm' — не включаем, lock-файла в проекте нет
 
-      - name: Install web-ext globally
-        run: npm install -g web-ext
+      - name: Cache global npm packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-global-npm-ajv-cli
+          restore-keys: |
+            ${{ runner.os }}-global-npm-
 
-      - name: Lint manifest.json
+      - name: Install AJV CLI
+        run: npm install -g ajv-cli
+
+      - name: Cache Chrome manifest schema
+        uses: actions/cache@v4
+        with:
+          path: chrome-manifest-schema.json
+          key: ${{ runner.os }}-chrome-schema-v3
+          restore-keys: |
+            ${{ runner.os }}-chrome-schema-
+
+      - name: Fetch Chrome manifest schema (V3)
         run: |
-          echo "🔍 Checking manifest.json for errors..."
-          web-ext lint --source-dir . --pretty
+          if [ ! -f chrome-manifest-schema.json ]; then
+            echo "⬇️ Downloading Chrome Manifest V3 schema..."
+            curl -fsSL -o chrome-manifest-schema.json \
+              https://raw.githubusercontent.com/swantbo/chrome-extesion-manifest-json-schema/main/manifest/manifest.schema.v3.json
+          else
+            echo "✅ Using cached schema"
+          fi
 
-      - name: Check JSON formatting (optional but recommended)
+      - name: Validate manifest against Chrome schema
+        run: |
+          echo "🔍 Validating manifest.json against Chrome schema..."
+          ajv validate -s chrome-manifest-schema.json -d manifest.json --strict=false
+
+      - name: Check JSON formatting
         run: |
           echo "🎨 Checking JSON formatting..."
           node -e "JSON.parse(require('fs').readFileSync('manifest.json', 'utf8')); console.log('✅ manifest.json is valid JSON')"
