@@ -11,12 +11,9 @@ on:
       - 'manifest.json'
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
   validate:
-    name: Validate manifest.json
+    name: Validate manifest.json (Chrome)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -27,13 +24,38 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install web-ext globally
-        run: npm install -g web-ext
+      - name: Cache global npm packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-global-npm-ajv-cli
+          restore-keys: |
+            ${{ runner.os }}-global-npm-
 
-      - name: Lint manifest.json
+      - name: Install AJV CLI
+        run: npm install -g ajv-cli
+
+      - name: Cache Chrome manifest schema
+        uses: actions/cache@v4
+        with:
+          path: chrome-manifest-schema.json
+          key: ${{ runner.os }}-chrome-schema-v1
+          restore-keys: |
+            ${{ runner.os }}-chrome-schema-
+
+      - name: Fetch Chrome manifest schema
         run: |
-          echo "🔍 Checking manifest.json for errors..."
-          web-ext lint --source-dir . --pretty
+          if [ ! -f chrome-manifest-schema.json ]; then
+            curl -sSL -o chrome-manifest-schema.json \
+              https://raw.githubusercontent.com/GoogleChrome/chrome-extensions-samples/main/_schema/manifest.json
+          else
+            echo "✅ Using cached schema"
+          fi
+
+      - name: Validate manifest against Chrome schema
+        run: |
+          echo "🔍 Validating manifest.json against Chrome schema..."
+          ajv validate -s chrome-manifest-schema.json -d manifest.json --strict=false
 
       - name: Check JSON formatting
         run: |
