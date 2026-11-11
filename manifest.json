@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "AI Chat Exporter (DeepSeek, Grok, ChatGPT, Qwen, Claude)",
+  "name": "AI Chat Exporter",
   "version": "2.0",
-  "description": "Export your AI chats to Markdown — locally, privately, with one click.",
+  "description": "Export your AI chats to Markdown — locally, privately, with one click. Supports: DeepSeek, Qwen, ChatGPT, Claude, Grok.",
   "permissions": [
     "activeTab",
     "notifications",
